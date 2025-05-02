@@ -150,9 +150,10 @@ function M.open_notes()
     if not line then return end
 
     if line:match("^%- %[ %]") then
-      -- Mark as done and move to bottom
+      -- Mark as done and move to bottom (after last checked item)
       local done_line = line:gsub("%- %[ %]", "- [x]")
       table.remove(lines, row + 1)
+      -- Find last checked item
       local insert_at = #lines
       for i = #lines, 1, -1 do
         if lines[i]:match("^%- %[x%]") then
@@ -162,26 +163,18 @@ function M.open_notes()
       end
       table.insert(lines, insert_at + 1, done_line)
       vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, lines)
-      local next_row = math.min(row + 1, #lines - 1)
-      vim.api.nvim_win_set_cursor(0, { next_row + 1, 0 })
+      vim.api.nvim_win_set_cursor(0, { insert_at + 2, 0 })
     elseif line:match("^%- %[x%]") then
-      -- Mark as not done and move to top (after header)
+      -- Mark as not done and move to top (just after header)
       local undone_line = line:gsub("%- %[x%]", "- [ ]")
       table.remove(lines, row + 1)
-      -- Find the first unchecked item (or after header)
-      local insert_at = 1
-      for i = 2, #lines do
-        if not lines[i]:match("^%- %[ %]") then
-          insert_at = i - 1
-          break
-        end
-        insert_at = i
-      end
-      table.insert(lines, insert_at + 1, undone_line)
+      -- Always insert after header (line 2, index 1)
+      table.insert(lines, 2, undone_line)
       vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, lines)
-      vim.api.nvim_win_set_cursor(0, { insert_at + 2, 0 })
+      vim.api.nvim_win_set_cursor(0, { 3, 0 })
     end
   end, { buffer = notes_buf, nowait = true })
+
 
   -- 'o' in normal mode: add new checklist item below and enter insert mode
   vim.keymap.set("n", "o", function()
