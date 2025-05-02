@@ -5,7 +5,6 @@ local notes_win = nil
 
 -- Hash function (SHA1, using Neovim's sha256 for simplicity)
 local function hash(str)
-  -- Use Neovim's sha256 and take first 16 chars for brevity
   return vim.fn.sha256(str):sub(1, 16)
 end
 
@@ -25,7 +24,6 @@ local function get_notes_path()
   local root = get_project_root()
   local hash_str = hash(root)
   local dir = vim.fn.stdpath("data") .. "/todonotes"
-  -- Ensure directory exists
   vim.fn.mkdir(dir, "p")
   return dir .. "/" .. hash_str .. ".md"
 end
@@ -41,16 +39,24 @@ local function load_notes()
     end
     f:close()
   end
-  if #lines == 0 then
-    lines = { "-- TODO Notes --", "- [ ] " }
+  -- Ensure all lines are checklist items
+  for i, line in ipairs(lines) do
+    if line:match("^%s*$") then
+      lines[i] = "- [ ] "
+    end
   end
   return lines
 end
 
--- Save notes to file
+-- Save notes to file, ensuring all lines are checklist items
 local function save_notes()
   if not notes_buf or not vim.api.nvim_buf_is_valid(notes_buf) then return end
   local lines = vim.api.nvim_buf_get_lines(notes_buf, 0, -1, false)
+  for i, line in ipairs(lines) do
+    if line:match("^%s*$") then
+      lines[i] = "- [ ] "
+    end
+  end
   local f = io.open(get_notes_path(), "w")
   if f then
     for _, line in ipairs(lines) do
@@ -65,9 +71,7 @@ local function setup_checklist_autocmd()
   vim.keymap.set("i", "<CR>", function()
     local pos = vim.api.nvim_win_get_cursor(0)
     local row = pos[1]
-    -- Insert a new checklist item below
     vim.api.nvim_buf_set_lines(notes_buf, row, row, false, { "- [ ] " })
-    -- Move cursor to after '- [ ] ' on the new line (column 6, 0-based)
     vim.api.nvim_win_set_cursor(0, { row + 1, 6 })
   end, { buffer = notes_buf })
 end
@@ -103,7 +107,7 @@ function M.open_notes()
     style = "minimal",
     border = "rounded",
     title = "todonotes",
-    title_pos = "left",
+    title_pos = "center",
   })
 
   vim.wo[notes_win].number = false
@@ -115,7 +119,8 @@ function M.open_notes()
     save_notes()
     M.close_notes()
   end, { buffer = notes_buf, nowait = true })
-  -- Intercept :w in the todo buffer to save and close
+
+  -- :w in the todo buffer: Save and close
   vim.api.nvim_create_autocmd("BufWriteCmd", {
     buffer = notes_buf,
     callback = function()
@@ -123,12 +128,6 @@ function M.open_notes()
       M.close_notes()
     end,
   })
-
-  -- Optional: :Write command
-  vim.api.nvim_buf_create_user_command(notes_buf, "Write", function()
-    save_notes()
-    M.close_notes()
-  end, { bang = true })
 
   -- <Space>: Mark as done and move to bottom
   vim.keymap.set("n", "<Space>", function()
@@ -159,10 +158,36 @@ function M.open_notes()
     local cur = vim.api.nvim_win_get_cursor(0)
     local row = cur[1]
     vim.api.nvim_buf_set_lines(notes_buf, row, row, false, { "- [ ] " })
-    -- Move cursor to after '- [ ] ' on the new line (column 6, 0-based)
     vim.api.nvim_win_set_cursor(0, { row + 1, 6 })
     vim.cmd("startinsert")
   end, { buffer = notes_buf })
+
+  -- 'O' in normal mode: add new checklist item above and enter insert mode
+  vim.keymap.set("n", "O", function()
+    local cur = vim.api.nvim_win_get_cursor(0)
+    local row = cur[1]
+    vim.api.nvim_buf_set_lines(notes_buf, row - 1, row - 1, false, { "- [ ] " })
+    vim.api.nvim_win_set_cursor(0, { row, 6 })
+    vim.cmd("startinsert")
+  end, { buffer = notes_buf })
+
+  -- Auto-fix empty lines to checklist items as you type
+  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+    buffer = notes_buf,
+    callback = function()
+      local lines = vim.api.nvim_buf_get_lines(notes_buf, 0, -1, false)
+      local changed = false
+      for i, line in ipairs(lines) do
+        if line:match("^%s*$") then
+          lines[i] = "- [ ] "
+          changed = true
+        end
+      end
+      if changed then
+        vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, lines)
+      end
+    end,
+  })
 
   -- Decide mode and cursor position
   local lines = vim.api.nvim_buf_get_lines(notes_buf, 0, -1, false)
@@ -175,15 +200,12 @@ function M.open_notes()
   end
 
   if #lines == 2 and lines[2] == "- [ ] " then
-    -- Only the initial item: go to insert mode at end of line
     vim.api.nvim_win_set_cursor(notes_win, {2, #lines[2]})
     vim.cmd("startinsert")
   elseif first_item then
-    -- Go to first unchecked item in normal mode
     vim.api.nvim_win_set_cursor(notes_win, {first_item, 0})
     vim.cmd("stopinsert")
   else
-    -- Fallback: top of buffer
     vim.api.nvim_win_set_cursor(notes_win, {1, 0})
     vim.cmd("stopinsert")
   end
