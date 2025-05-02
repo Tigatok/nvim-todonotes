@@ -163,17 +163,23 @@ function M.open_notes()
       end
       table.insert(lines, insert_at + 1, done_line)
       vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, lines)
-      vim.api.nvim_win_set_cursor(0, { insert_at + 2, 0 })
+      -- Clamp cursor to valid line
+      local new_row = math.min(insert_at + 2, #lines)
+      vim.api.nvim_win_set_cursor(0, { new_row, 0 })
     elseif line:match("^%- %[x%]") then
-      -- Mark as not done and move to top (just after header)
+      -- Mark as not done and move to just after header (line 2, index 1)
       local undone_line = line:gsub("%- %[x%]", "- [ ]")
       table.remove(lines, row + 1)
-      -- Always insert after header (line 2, index 1)
-      table.insert(lines, 2, undone_line)
+      local insert_at = math.min(2, #lines + 1)
+      table.insert(lines, insert_at, undone_line)
       vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, lines)
-      vim.api.nvim_win_set_cursor(0, { 3, 0 })
+      -- Clamp cursor to valid line
+      local new_row = math.min(insert_at + 1, #lines)
+      vim.api.nvim_win_set_cursor(0, { new_row, 0 })
     end
   end, { buffer = notes_buf, nowait = true })
+
+
 
 
   -- 'o' in normal mode: add new checklist item below and enter insert mode
