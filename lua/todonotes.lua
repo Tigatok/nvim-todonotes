@@ -51,7 +51,7 @@ local function load_notes()
   return lines
 end
 
--- Save notes to file, ensuring all lines are checklist items
+-- Save notes to file, ensuring all lines are checklist items and mark unmodified
 local function save_notes()
   if not notes_buf or not vim.api.nvim_buf_is_valid(notes_buf) then return end
   local lines = vim.api.nvim_buf_get_lines(notes_buf, 0, -1, false)
@@ -67,6 +67,7 @@ local function save_notes()
     end
     f:close()
   end
+  vim.api.nvim_buf_set_option(notes_buf, "modified", false)
 end
 
 -- Insert checklist prefix on new lines in insert mode
@@ -94,6 +95,14 @@ function M.open_notes()
     vim.api.nvim_buf_set_option(notes_buf, "filetype", "todonotes")
     vim.api.nvim_buf_set_lines(notes_buf, 0, -1, false, load_notes())
     setup_checklist_autocmd()
+
+    -- Autosave and mark unmodified on buffer/window close
+    vim.api.nvim_create_autocmd({ "BufWinLeave", "BufUnload" }, {
+      buffer = notes_buf,
+      callback = function()
+        save_notes()
+      end,
+    })
   end
 
   local width = math.floor(vim.o.columns * 0.5)
@@ -234,6 +243,7 @@ end
 
 function M.close_notes()
   if notes_win and vim.api.nvim_win_is_valid(notes_win) then
+    save_notes()
     vim.api.nvim_win_close(notes_win, true)
     notes_win = nil
   end
