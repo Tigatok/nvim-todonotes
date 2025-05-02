@@ -39,6 +39,9 @@ local function load_notes()
     end
     f:close()
   end
+  if #lines == 0 then
+    lines = { "-- TODO Notes --", "- [ ] " }
+  end
   -- Ensure all lines are checklist items
   for i, line in ipairs(lines) do
     if line:match("^%s*$") then
@@ -85,7 +88,7 @@ function M.open_notes()
   if not notes_buf or not vim.api.nvim_buf_is_valid(notes_buf) then
     notes_buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(notes_buf, "todonotes")
-    vim.api.nvim_buf_set_option(notes_buf, "buftype", "nofile")
+    vim.api.nvim_buf_set_option(notes_buf, "buftype", "acwrite")
     vim.api.nvim_buf_set_option(notes_buf, "bufhidden", "hide")
     vim.api.nvim_buf_set_option(notes_buf, "swapfile", false)
     vim.api.nvim_buf_set_option(notes_buf, "filetype", "todonotes")
@@ -107,7 +110,7 @@ function M.open_notes()
     style = "minimal",
     border = "rounded",
     title = "todonotes",
-    title_pos = "center",
+    title_pos = "left",
   })
 
   vim.wo[notes_win].number = false
@@ -126,6 +129,7 @@ function M.open_notes()
     callback = function()
       save_notes()
       M.close_notes()
+      return true
     end,
   })
 
@@ -188,6 +192,23 @@ function M.open_notes()
       end
     end,
   })
+
+  -- Remap a/i/I/A to always start after the checklist prefix
+  local function after_checkbox()
+    local row = vim.api.nvim_win_get_cursor(0)[1]
+    vim.api.nvim_win_set_cursor(0, { row, 6 })
+    vim.cmd("startinsert")
+  end
+
+  vim.keymap.set("n", "a", after_checkbox, { buffer = notes_buf })
+  vim.keymap.set("n", "i", after_checkbox, { buffer = notes_buf })
+  vim.keymap.set("n", "I", after_checkbox, { buffer = notes_buf })
+  vim.keymap.set("n", "A", function()
+    local row = vim.api.nvim_win_get_cursor(0)[1]
+    local line = vim.api.nvim_get_current_line()
+    vim.api.nvim_win_set_cursor(0, { row, #line })
+    vim.cmd("startinsert")
+  end, { buffer = notes_buf })
 
   -- Decide mode and cursor position
   local lines = vim.api.nvim_buf_get_lines(notes_buf, 0, -1, false)
