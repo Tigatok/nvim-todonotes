@@ -28,7 +28,7 @@ A simple, fast, project-aware floating TODO checklist for Neovim.
 
 ```lua
 {
-  "yourusername/nvim-todonotes",
+  "tigatok/nvim-todonotes",
   config = function()
     local todonotes = require("todonotes")
     vim.keymap.set("n", "<leader>tt", function()
