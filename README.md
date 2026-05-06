@@ -33,7 +33,10 @@ A simple, fast, project-aware floating TODO checklist for Neovim.
     local todonotes = require("todonotes")
     vim.keymap.set("n", "<leader>tt", function()
       todonotes.toggle_notes()
-    end, { desc = "Toggle Todo Notes" })
+    end, { desc = "Toggle Todo Notes (project)" })
+    vim.keymap.set("n", "<leader>tT", function()
+      todonotes.toggle_notes("global")
+    end, { desc = "Toggle Todo Notes (global)" })
   end,
 }
 ```

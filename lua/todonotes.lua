@@ -2,6 +2,7 @@ local M = {}
 
 local notes_buf = nil
 local notes_win = nil
+local current_scope = "project"
 
 -- Hash function (SHA1, using Neovim's sha256 for simplicity)
 local function hash(str)
@@ -19,12 +20,15 @@ local function get_project_root()
   end
 end
 
--- Path to notes file for this project (Harpoon-style)
+-- Path to notes file (project-scoped or global)
 local function get_notes_path()
-  local root = get_project_root()
-  local hash_str = hash(root)
   local dir = vim.fn.stdpath("data") .. "/todonotes"
   vim.fn.mkdir(dir, "p")
+  if current_scope == "global" then
+    return dir .. "/global.md"
+  end
+  local root = get_project_root()
+  local hash_str = hash(root)
   return dir .. "/" .. hash_str .. ".md"
 end
 
@@ -80,15 +84,28 @@ local function setup_checklist_autocmd()
   end, { buffer = notes_buf })
 end
 
-function M.open_notes()
-  if notes_win and vim.api.nvim_win_is_valid(notes_win) then
+function M.open_notes(scope)
+  scope = scope or "project"
+
+  if notes_win and vim.api.nvim_win_is_valid(notes_win) and scope == current_scope then
     vim.api.nvim_set_current_win(notes_win)
     return
   end
 
+  if scope ~= current_scope then
+    M.close_notes()
+    if notes_buf and vim.api.nvim_buf_is_valid(notes_buf) then
+      vim.api.nvim_buf_delete(notes_buf, { force = true })
+      notes_buf = nil
+    end
+    current_scope = scope
+  end
+
+  local buf_name = scope == "global" and "todonotes-global" or "todonotes"
+
   if not notes_buf or not vim.api.nvim_buf_is_valid(notes_buf) then
     notes_buf = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(notes_buf, "todonotes")
+    vim.api.nvim_buf_set_name(notes_buf, buf_name)
     vim.api.nvim_buf_set_option(notes_buf, "buftype", "acwrite")
     vim.api.nvim_buf_set_option(notes_buf, "bufhidden", "hide")
     vim.api.nvim_buf_set_option(notes_buf, "swapfile", false)
@@ -118,7 +135,7 @@ function M.open_notes()
     col = col,
     style = "minimal",
     border = "rounded",
-    title = "todonotes",
+    title = scope == "global" and "todonotes (global)" or "todonotes",
     title_pos = "left",
   })
 
@@ -265,11 +282,12 @@ function M.close_notes()
   end
 end
 
-function M.toggle_notes()
-  if notes_win and vim.api.nvim_win_is_valid(notes_win) then
+function M.toggle_notes(scope)
+  scope = scope or "project"
+  if notes_win and vim.api.nvim_win_is_valid(notes_win) and scope == current_scope then
     M.close_notes()
   else
-    M.open_notes()
+    M.open_notes(scope)
   end
 end
 
